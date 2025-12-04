@@ -29,10 +29,10 @@ import { useActiveBanners } from '../hooks/useBanners';
 import { useActiveCategories } from '../hooks/useCategories';
 import { useActivePlayMenuItems } from '../hooks/usePlayMenu';
 import {
-  Product,
-  useProducts,
-  useProductSearch,
-  useTrendingProducts
+    Product,
+    useProducts,
+    useProductSearch,
+    useTrendingProducts
 } from '../hooks/useProducts';
 import messageStorage from '../services/messageStorage';
 import socketService from '../services/socketService';
@@ -43,7 +43,7 @@ const { width: screenWidth } = Dimensions.get('window');
 
 
 export default function CatalogScreen() {
-  const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession, sessionRoomId, setParticipantProduct, setParticipants } = useSession();
+  const { isInSession, isHost, sessionParticipants, presenterName, isMuted, toggleMute, endSession, sessionRoomId, setParticipantProduct, setParticipants, selectedWardrobeId } = useSession();
   const { user } = useAuth();
   
   // Debug session state
@@ -136,6 +136,18 @@ export default function CatalogScreen() {
       endSession();
     }
   }, [sessionRoomId, user, isHost, endSession]);
+
+  // Wardrobe navigation handler
+  const handleWardrobePress = React.useCallback(() => {
+    if (selectedWardrobeId) {
+      console.log('👔 Opening wardrobe:', selectedWardrobeId);
+      router.push(`/wardrobe/${selectedWardrobeId}`);
+    } else {
+      console.log('⚠️ No wardrobe selected for this session');
+      // Navigate to wardrobe selection if no wardrobe is linked
+      router.push('/wardrobes');
+    }
+  }, [selectedWardrobeId]);
 
   // Note: Do not auto-cleanup on unmount to avoid navigation race loops.
 
@@ -851,6 +863,7 @@ export default function CatalogScreen() {
         {isInSession && (
           <SessionBottomControls
             onScreenShare={() => {}}
+            onWardrobePress={handleWardrobePress}
             onToggleMute={toggleMute}
             onEndCall={handleEndAndCleanup}
             isMuted={isMuted}

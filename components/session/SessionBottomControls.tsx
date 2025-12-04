@@ -4,6 +4,7 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 interface SessionBottomControlsProps {
   onScreenShare?: () => void;
+  onWardrobePress?: () => void;
   onToggleMute: () => void;
   onEndCall: () => void;
   isMuted: boolean;
@@ -11,6 +12,7 @@ interface SessionBottomControlsProps {
 
 export default function SessionBottomControls({
   onScreenShare,
+  onWardrobePress,
   onToggleMute,
   onEndCall,
   isMuted,
@@ -20,6 +22,12 @@ export default function SessionBottomControls({
       <TouchableOpacity style={styles.controlButton} onPress={onScreenShare}>
         <Ionicons name="grid-outline" size={20} color="white" />
       </TouchableOpacity>
+      
+      {onWardrobePress && (
+        <TouchableOpacity style={styles.controlButton} onPress={onWardrobePress}>
+          <Ionicons name="shirt-outline" size={20} color="white" />
+        </TouchableOpacity>
+      )}
       
       <TouchableOpacity 
         style={[styles.controlButton, isMuted && styles.mutedButton]} 

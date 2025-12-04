@@ -17,82 +17,13 @@ import { useAuth } from '../contexts/auth-context';
 import { useSession } from '../contexts/session-context';
 import socketService from '../services/socketService';
 import { wardrobeApi } from '../services/wardrobeApi';
-
-interface WardrobeCategory {
-    id: string;
-    name: string;
-    subtitle: string;
-    items: WardrobeItem[];
-}
+import { getDefaultImageProps, getProductImageUri } from '../utils/imageUtils';
 
 interface WardrobeItem {
     id: string;
     image: string;
 }
 
-const wardrobeCategories: WardrobeCategory[] = [
-    {
-        id: "1",
-        name: "Striped Crop Shirt",
-        subtitle: "AI Powered",
-        items: [
-            {
-                id: "1",
-                image: "https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=150&h=200&fit=crop",
-            },
-            {
-                id: "2",
-                image: "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=150&h=200&fit=crop",
-            },
-            {
-                id: "3",
-                image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=150&h=200&fit=crop",
-            },
-            {
-                id: "4",
-                image: "https://images.unsplash.com/photo-1586790170083-2f9ceadc732d?w=150&h=200&fit=crop",
-            },
-            {
-                id: "5",
-                image: "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=150&h=200&fit=crop",
-            },
-        ],
-    },
-    {
-        id: "2",
-        name: "Modern Kurtis",
-        subtitle: "AI Powered",
-        items: [
-            {
-                id: "6",
-                image: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=150&h=200&fit=crop",
-            },
-            {
-                id: "7",
-                image: "https://images.unsplash.com/photo-1583391733956-6c78276477e2?w=150&h=200&fit=crop",
-            },
-            {
-                id: "8",
-                image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=150&h=200&fit=crop",
-            },
-        ],
-    },
-    {
-        id: "3",
-        name: "Daytime Looks",
-        subtitle: "AI Powered",
-        items: [
-            {
-                id: "9",
-                image: "https://images.unsplash.com/photo-1516726817505-f5ed825624d8?w=300&h=200&fit=crop",
-            },
-            {
-                id: "10",
-                image: "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?w=150&h=200&fit=crop",
-            },
-        ],
-    },
-];
 
 type SessionStep = "wardrobe" | "notify" | "start";
 
@@ -105,6 +36,7 @@ export default function StartSessionScreen() {
     const [isNotifying, setIsNotifying] = useState(false);
     const [realWardrobes, setRealWardrobes] = useState<any[]>([]);
     const [loadingWardrobes, setLoadingWardrobes] = useState(false);
+    const [wardrobeItems, setWardrobeItems] = useState<{[key: string]: any[]}>({});
     const { startSession, setParticipants } = useSession();
     const { user } = useAuth();
 
@@ -124,47 +56,56 @@ export default function StartSessionScreen() {
                 return;
             }
 
-            const response = await wardrobeApi.getWardrobes(token, { limit: 50 });
+            // Get roomId from params or use default
+            const currentRoomId = (roomIdParam as string) || '1';
+            console.log('Loading wardrobes for room:', currentRoomId);
+
+            const response = await wardrobeApi.getWardrobes(token, { 
+                limit: 50,
+                roomId: currentRoomId 
+            });
             if (response.status === 'success' && response.data) {
-                // Convert real wardrobes to original UI format
-                const convertedWardrobes = response.data.wardrobes.map((wardrobe: any) => {
-                    // Generate diverse sample images for wardrobe items
-                    const sampleImages = [
-                        'https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=150&h=200&fit=crop',
-                        'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=150&h=200&fit=crop',
-                        'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=150&h=200&fit=crop',
-                        'https://images.unsplash.com/photo-1583743814966-fa38a8414556?w=150&h=200&fit=crop',
-                        'https://images.unsplash.com/photo-1523381294911-8d3cead2f61c?w=150&h=200&fit=crop',
-                        'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=150&h=200&fit=crop',
-                        'https://images.unsplash.com/photo-1525507119060-efcd09af0796?w=150&h=200&fit=crop',
-                        'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=150&h=200&fit=crop',
-                        'https://images.unsplash.com/photo-1560243563-062bfc001d68?w=150&h=200&fit=crop',
-                        'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=150&h=200&fit=crop'
-                    ];
-                    
-                    return {
-                        id: wardrobe._id,
-                        name: wardrobe.name,
-                        subtitle: wardrobe.occasionType || 'AI Powered',
-                        items: Array.from({ length: Math.min(5, wardrobe.itemCount || 3) }, (_, index) => ({
-                            id: `${wardrobe._id}_${index}`,
-                            image: sampleImages[index % sampleImages.length]
-                        }))
-                    };
+                const wardrobesData = response.data.wardrobes;
+                setRealWardrobes(wardrobesData);
+                
+                // Load items for each wardrobe
+                const itemsPromises = wardrobesData.map(async (wardrobe: any) => {
+                    try {
+                        const itemsResponse = await wardrobeApi.getWardrobeItems(token, wardrobe._id, { limit: 10 });
+                        if (itemsResponse.status === 'success' && itemsResponse.data) {
+                            return { wardrobeId: wardrobe._id, items: itemsResponse.data.items };
+                        }
+                    } catch (error) {
+                        console.error(`Error loading items for wardrobe ${wardrobe._id}:`, error);
+                    }
+                    return { wardrobeId: wardrobe._id, items: [] };
                 });
-                setRealWardrobes(convertedWardrobes);
+                
+                const itemsResults = await Promise.all(itemsPromises);
+                const itemsMap: {[key: string]: any[]} = {};
+                itemsResults.forEach(result => {
+                    itemsMap[result.wardrobeId] = result.items;
+                });
+                setWardrobeItems(itemsMap);
+                
+                console.log(`Loaded ${wardrobesData.length} wardrobes for room ${currentRoomId}`);
+            } else {
+                console.log('No wardrobes found for room:', currentRoomId);
+                setRealWardrobes([]);
+                setWardrobeItems({});
             }
         } catch (error) {
             console.error('Error loading wardrobes:', error);
+            setRealWardrobes([]);
         } finally {
             setLoadingWardrobes(false);
         }
     };
 
-    // Load wardrobes on component mount
+    // Load wardrobes on component mount and when roomId changes
     useEffect(() => {
         loadRealWardrobes();
-    }, []);
+    }, [roomIdParam]);
 
     if (!fontsLoaded) {
         return null;
@@ -321,6 +262,11 @@ export default function StartSessionScreen() {
             { key: "start", label: "Start a Session", completed: false },
         ];
 
+        // Get selected wardrobe name for display
+        const selectedWardrobeName = selectedWardrobe ? 
+            (realWardrobes.find(w => w.id === selectedWardrobe)?.name || 'Selected Wardrobe') : 
+            null;
+
         return (
             <View style={styles.progressContainer}>
                 <View style={styles.progressTrack}>
@@ -349,6 +295,12 @@ export default function StartSessionScreen() {
                             >
                                 {step.label}
                             </Text>
+                            {/* Show selected wardrobe name under the wardrobe step */}
+                            {step.key === "wardrobe" && selectedWardrobeName && (
+                                <Text style={styles.selectedWardrobeName}>
+                                    {selectedWardrobeName}
+                                </Text>
+                            )}
                         </View>
                     ))}
                 </View>
@@ -356,27 +308,68 @@ export default function StartSessionScreen() {
         );
     };
 
-    const renderWardrobeItem = ({ item }: { item: WardrobeItem }) => {
-        const fallbackImage = 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=150&h=200&fit=crop';
-        
+    const renderWardrobeItem = ({ item }: { item: any }) => {
+        // Handle null productId
+        if (!item.productId) {
+            return (
+                <TouchableOpacity 
+                    style={styles.wardrobeItemImage}
+                    onPress={() => {
+                        // Don't navigate if no product
+                    }}
+                >
+                    <Image 
+                        source={{ uri: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=500&fit=crop' }} 
+                        style={styles.wardrobeItemImageContent}
+                        resizeMode="cover"
+                    />
+                    <View style={styles.itemPriceContainer}>
+                        <Text style={styles.itemPrice}>₹0</Text>
+                    </View>
+                </TouchableOpacity>
+            );
+        }
+
         return (
-            <Image 
-                source={{ uri: item.image || fallbackImage }} 
+            <TouchableOpacity 
                 style={styles.wardrobeItemImage}
-                defaultSource={{ uri: fallbackImage }}
-                onError={(e) => {
-                    console.log('Image failed to load:', item.image);
+                onPress={() => {
+                    // Don't navigate in start session, just for display
                 }}
-            />
+            >
+                <Image 
+                    source={{ uri: getProductImageUri(item.productId) }} 
+                    style={styles.wardrobeItemImageContent}
+                    resizeMode="cover"
+                    {...getDefaultImageProps()}
+                />
+                <View style={styles.itemPriceContainer}>
+                    <Text style={styles.itemPrice}>₹{item.productId.price || 0}</Text>
+                </View>
+            </TouchableOpacity>
         );
     };
 
 
-    const renderWardrobeCategory = ({ item, index }: { item: WardrobeCategory; index: number }) => {
+    const renderWardrobeCategory = ({ item, index }: { item: any; index: number }) => {
         const isEven = index % 2 === 0;
         const gradientColors = isEven 
             ? ['#F3F1FE', '#FFFFFF'] as const // Purple to white
             : ['#FFEEEC', '#FFFFFF'] as const; // Pink to white
+        
+        const wardrobeItemsList = wardrobeItems[item._id] || [];
+
+        // Determine current user's role for this wardrobe
+        let currentUserRole: 'Owner' | 'Editor' | 'Contributor' | 'Viewer' | null = null;
+        if (user) {
+            if (item.owner && (item.owner as any)._id === user._id) {
+                currentUserRole = 'Owner';
+            } else if (Array.isArray(item.members)) {
+                const selfMember = item.members.find((m: any) => (m.userId as any)._id === user._id);
+                currentUserRole = (selfMember?.role as any) || null;
+            }
+        }
+        const roleLabel = currentUserRole || 'Viewer';
         
         return (
             <LinearGradient
@@ -385,35 +378,46 @@ export default function StartSessionScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 0, y: 1 }}
             >
-                <View style={styles.roleBadge}>
-                    <Text style={styles.roleText}>Editor</Text>
+                <View style={[
+                    styles.roleBadge,
+                    isEven ? styles.roleBadgePurple : styles.roleBadgePink
+                ]}>
+                    <Text style={styles.roleText}>{roleLabel}</Text>
                 </View>
                 
                 <View style={styles.categoryHeader}>
                     <View style={styles.categoryInfo}>
                         <Text style={styles.categoryName}>{item.name}</Text>
-                        <View style={styles.subtitleContainer}>
-                            <View style={styles.aiIcon} />
-                            <Text style={styles.categorySubtitle}>{item.subtitle}</Text>
-                        </View>
+                        {item.occasionType && item.occasionType !== 'General Collection' && (
+                            <View style={styles.subtitleContainer}>
+                                <View style={styles.aiIcon} />
+                                <Text style={styles.categorySubtitle}>{item.occasionType}</Text>
+                            </View>
+                        )}
                     </View>
                 </View>
 
-                <FlatList
-                    data={item.items}
-                    renderItem={renderWardrobeItem}
-                    keyExtractor={(wardrobeItem) => wardrobeItem.id}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.itemsList}
-                    style={styles.horizontalList}
-                />
+                {wardrobeItemsList.length === 0 ? (
+                    <View style={styles.emptyItemsRow}>
+                        <Text style={styles.emptyItemsText}>No items yet</Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={wardrobeItemsList}
+                        renderItem={renderWardrobeItem}
+                        keyExtractor={(wardrobeItem) => wardrobeItem._id}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.itemsList}
+                        style={styles.horizontalList}
+                    />
+                )}
 
                 <TouchableOpacity
                     style={styles.viewAllButton}
-                    onPress={() => handleWardrobeSelect(item.id)}
+                    onPress={() => handleWardrobeSelect(item._id)}
                 >
-                    <Text style={styles.viewAllText}>Select</Text>
+                    <Text style={styles.viewAllText}>Select ({wardrobeItemsList.length})</Text>
                     <Text style={styles.viewAllArrow}>›</Text>
                 </TouchableOpacity>
             </LinearGradient>
@@ -421,17 +425,22 @@ export default function StartSessionScreen() {
     };
 
     const renderWardrobeStep = () => {
-        const dataToShow = realWardrobes.length > 0 ? realWardrobes : wardrobeCategories;
-        
         return (
             <View style={styles.stepContent}>
                 {loadingWardrobes ? (
                     <View style={styles.loadingContainer}>
                         <Text style={styles.loadingText}>Loading wardrobes...</Text>
                     </View>
+                ) : realWardrobes.length === 0 ? (
+                    <View style={styles.emptyWardrobesContainer}>
+                        <Text style={styles.emptyWardrobesTitle}>No Wardrobes Found</Text>
+                        <Text style={styles.emptyWardrobesMessage}>
+                            This room doesn't have any wardrobes yet. Create a wardrobe first to start a session.
+                        </Text>
+                    </View>
                 ) : (
                     <FlatList
-                        data={dataToShow}
+                        data={realWardrobes}
                         renderItem={({ item, index }) => renderWardrobeCategory({ item, index })}
                         keyExtractor={(item) => item.id}
                         showsVerticalScrollIndicator={false}
@@ -637,6 +646,61 @@ const styles = StyleSheet.create({
         color: "#E91E63",
         fontWeight: "600",
     },
+    selectedWardrobeName: {
+        fontSize: 8,
+        color: "#E91E63",
+        textAlign: "center",
+        marginTop: 2,
+        fontWeight: "500",
+    },
+    // Wardrobe item styles matching wardrobes screen
+    wardrobeItemImage: {
+        width: 96,
+        height: 120,
+        marginRight: 6,
+        borderRadius: 8,
+        overflow: 'hidden',
+        backgroundColor: '#f0f0f0',
+        position: 'relative',
+    },
+    wardrobeItemImageContent: {
+        width: '100%',
+        height: '100%',
+    },
+    itemPriceContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+    },
+    itemPrice: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    emptyItemsRow: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 40,
+    },
+    emptyItemsText: {
+        fontSize: 12,
+        color: '#999',
+        fontStyle: 'italic',
+        textAlign: 'center',
+    },
+    roleBadgePurple: {
+        backgroundColor: '#8B5CF6',
+    },
+    roleBadgePink: {
+        backgroundColor: '#E91E63',
+    },
     stepContent: {
         flex: 1,
     },
@@ -645,29 +709,30 @@ const styles = StyleSheet.create({
         paddingBottom: 100,
     },
     categoryContainer: {
-        marginBottom: 24,
-        paddingTop: 16,
+        borderRadius: 0,
+        marginBottom: 16,
         paddingHorizontal: 16,
-        paddingBottom: 0,
-        minHeight: 220,
+        paddingVertical: 12,
+        backgroundColor: 'transparent',
+        shadowColor: 'transparent',
+        shadowOffset: {
+            width: 0,
+            height: 0,
+        },
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        elevation: 0,
     },
     categoryHeader: {
-        marginBottom: 8,
+        marginBottom: 16,
     },
     horizontalList: {
-        marginHorizontal: -16,
-        marginBottom: 0,
+        marginBottom: 12,
+        paddingLeft: 12,
+        paddingRight: 12,
     },
     itemsList: {
-        paddingHorizontal: 16,
-        gap: 8,
-    },
-    wardrobeItemImage: {
-        width: 140,
-        height: 150,
-        borderRadius: 8,
-        marginRight: 8,
-        backgroundColor: "#f0f0f0",
+        paddingRight: 12,
     },
     categoryFooter: {
         flexDirection: "row",
@@ -678,63 +743,56 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     categoryName: {
-        fontSize: 12,
-        fontWeight: "600",
-        color: "#000",
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 2,
     },
     subtitleContainer: {
-        flexDirection: "row",
-        alignItems: "center",
+        flexDirection: 'row',
+        alignItems: 'center',
     },
     aiIcon: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: "#FF69B4",
-        marginRight: 4,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#ff6b6b',
+        marginRight: 6,
     },
     categorySubtitle: {
-        fontSize: 10,
-        color: "#666",
+        fontSize: 12,
+        color: '#666',
     },
     roleBadge: {
-        position: "absolute",
-        top: 8,
-        right: 16,
-        backgroundColor: "rgba(0, 0, 0, 0.6)",
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 8,
-        zIndex: 10,
+        alignSelf: 'flex-start',
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+        borderRadius: 10,
+        marginBottom: 10,
     },
     roleText: {
-        fontSize: 8,
-        color: "#CCCCCC",
-        fontWeight: "500",
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#fff',
     },
     viewAllButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 6,
-        marginTop: 12,
-        marginHorizontal: 16,
-        marginBottom: 12,
-        backgroundColor: "#F5F5F5",
-        borderRadius: 8,
-        alignSelf: "center",
-        minWidth: 370,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        backgroundColor: '#f8f8f8',
+        borderRadius: 6,
     },
     viewAllText: {
         fontSize: 12,
-        color: "#333",
-        fontWeight: "500",
-        marginRight: 4,
+        fontWeight: '600',
+        color: '#333',
+        marginRight: 2,
     },
     viewAllArrow: {
         fontSize: 12,
-        color: "#333",
-        fontWeight: "500",
+        color: '#666',
     },
     notifyGifContainer: {
         flex: 1,
@@ -860,5 +918,25 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#666',
         marginTop: 10,
+    },
+    emptyWardrobesContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 40,
+        paddingVertical: 60,
+    },
+    emptyWardrobesTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    emptyWardrobesMessage: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 20,
     },
 });

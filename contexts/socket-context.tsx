@@ -61,15 +61,22 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
       // Create new socket connection
       const newSocket = io('http://10.120.129.218:5000', {  //here
-
         auth: {
           token,
           userId: user._id,
-          userName: user.name
+          userName: user.name,
+          userAvatar: user.profileImage
         },
         transports: ['websocket', 'polling'],
         timeout: 20000,
         forceNew: true
+      });
+
+      console.log('🔌 Socket auth data:', {
+        token: token ? `${token.substring(0, 20)}...` : 'none',
+        userId: user._id,
+        userName: user.name,
+        userAvatar: user.profileImage
       });
 
       // Connection event handlers
@@ -92,7 +99,24 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       newSocket.on('connect_error', (error) => {
         console.error('🔌 Socket connection error:', error);
         setIsConnected(false);
-        scheduleReconnect();
+        
+        // Handle specific error types
+        if (error.message && error.message.includes('Token user mismatch')) {
+          console.log('🔄 Token mismatch detected, clearing auth data and reconnecting...');
+          // Clear potentially stale auth data
+          AsyncStorage.removeItem('auth_token');
+          AsyncStorage.removeItem('userData');
+          // Try to reconnect after a delay
+          setTimeout(() => {
+            connect();
+          }, 2000);
+        } else if (error.message && error.message.includes('Authentication failed')) {
+          console.log('🔄 Authentication failed, clearing auth data...');
+          AsyncStorage.removeItem('auth_token');
+          AsyncStorage.removeItem('userData');
+        } else {
+          scheduleReconnect();
+        }
       });
 
       newSocket.on('room-joined', (roomId) => {

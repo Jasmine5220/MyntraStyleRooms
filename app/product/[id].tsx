@@ -35,7 +35,7 @@ export default function ProductDetailScreen() {
   const id = params.id as string | undefined;
   const fromWardrobeId = params.fromWardrobeId as string | undefined;
   const normalizedId = typeof id === 'string' ? id : '';
-  const { sessionRoomId, isInSession, setParticipantProduct, sessionParticipants, addParticipant, setParticipants } = useSession();
+  const { sessionRoomId, isInSession, selectedWardrobeId, setParticipantProduct, sessionParticipants, addParticipant, setParticipants } = useSession();
   const { user } = useAuth();
   
   // Always call hooks; guard their effects internally
@@ -187,6 +187,12 @@ export default function ProductDetailScreen() {
 
   // Wardrobe functionality
   const handleAddToWardrobe = () => {
+    // If in a session with a selected wardrobe, add directly to that wardrobe
+    if (isInSession && selectedWardrobeId) {
+      handleWardrobeSelect(selectedWardrobeId);
+      return;
+    }
+    
     // If arrived from a wardrobe, preselect that wardrobe's room context
     if (fromWardrobeId) {
       setSelectedRoomIdForWardrobe(sessionRoomId || null);
@@ -267,6 +273,8 @@ export default function ProductDetailScreen() {
         timestamp: new Date().toISOString(),
         isProduct: true,
         productData: {
+          productId: product._id,
+          _id: product._id,
           name: product.name,
           price: `₹${product.price.toLocaleString()}`,
           image: product.image,
@@ -595,7 +603,9 @@ export default function ProductDetailScreen() {
                 ) : (
                   <Ionicons name="shirt-outline" size={20} color="#E91E63" />
                 )}
-                <Text style={styles.wardrobeButtonText}>Add to Wardrobe</Text>
+                <Text style={styles.wardrobeButtonText}>
+                  {isInSession && selectedWardrobeId ? 'Add to Session Wardrobe' : 'Add to Wardrobe'}
+                </Text>
               </TouchableOpacity>
               
               <TouchableOpacity 

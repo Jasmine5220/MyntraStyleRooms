@@ -100,16 +100,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -159,7 +159,7 @@ interface Room {
 const mockRooms: Room[] = [
   // Invited Rooms
   {
-    id: '1',
+    _id: '1',
     name: 'College Freshers Party',
     lastMessage: 'Richa: Hey! Check out this cute top I found',
     memberCount: 12,
@@ -173,7 +173,7 @@ const mockRooms: Room[] = [
     ]
   },
   {
-    id: '2',
+    _id: '2',
     name: 'Wedding Shopping',
     lastMessage: 'AI: Elegant lehenga suggestions under ₹15K',
     memberCount: 8,
@@ -188,7 +188,7 @@ const mockRooms: Room[] = [
   },
   // Joined Rooms
   {
-    id: '3',
+    _id: '3',
     name: 'Family Wedding',
     lastMessage: 'Mom: The saree looks perfect!',
     memberCount: 25,
@@ -202,7 +202,7 @@ const mockRooms: Room[] = [
     ]
   },
   {
-    id: '4',
+    _id: '4',
     name: 'Friends Reunion',
     lastMessage: 'Sarah: Can\'t wait to see everyone!',
     memberCount: 18,
@@ -216,7 +216,7 @@ const mockRooms: Room[] = [
     ]
   },
   {
-    id: '5',
+    _id: '5',
     name: 'Work Conference',
     lastMessage: 'AI: Professional business attire',
     memberCount: 7,
@@ -307,13 +307,9 @@ export default function HomeScreen() {
         allRooms = [...allRooms, ...invitedRooms];
       }
       
-      if (allRooms.length > 0) {
-        setRooms(allRooms);
-      } else {
-        // Fallback to mock data if API fails
-        console.log('API failed, using mock data');
-        setRooms(mockRooms);
-      }
+      // For authenticated users, do NOT show mock rooms when there are none.
+      // If the API returned no rooms or invitations, set an empty list.
+      setRooms(allRooms);
     } catch (error) {
       console.error('Error fetching rooms:', error);
       // Fallback to mock data
@@ -638,7 +634,19 @@ export default function HomeScreen() {
             />
           }
         >
-          {filteredRooms.map((item, index) => (
+          {rooms.length === 0 ? (
+            <View style={styles.emptyListContainer}>
+              <Text style={styles.joinRoomTitle}>No rooms yet</Text>
+              <Text style={styles.emptyListSubtitle}>Create a room or accept an invite to get started.</Text>
+              <TouchableOpacity 
+                style={styles.emptyActionButton}
+                onPress={() => router.push('/room/create')}
+              >
+                <Text style={styles.emptyActionButtonText}>Create a room</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            filteredRooms.map((item, index) => (
             <TouchableOpacity 
               key={item._id || `room-${index}`} 
               style={styles.roomCard}
@@ -724,7 +732,8 @@ export default function HomeScreen() {
                 </View>
               </View>
             </TouchableOpacity>
-          ))}
+            ))
+          )}
         </ScrollView>
 
       </View>
@@ -872,6 +881,29 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  emptyListContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+  },
+  emptyListSubtitle: {
+    color: '#666',
+    fontSize: 12,
+    marginTop: 6,
+  },
+  emptyActionButton: {
+    marginTop: 12,
+    backgroundColor: '#FF6FA3',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  emptyActionButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   roomCard: {
     backgroundColor: 'white',

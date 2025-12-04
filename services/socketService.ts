@@ -154,6 +154,19 @@ class SocketService {
 
     this.socket.on('connect_error', (error) => {
       console.warn('❌ Socket connection error:', error?.message || error);
+      
+      // Handle specific authentication errors
+      if (error?.message && error.message.includes('Token user mismatch')) {
+        console.log('🔄 Token mismatch detected, clearing auth data...');
+        // Clear potentially stale auth data
+        AsyncStorage.removeItem('auth_token');
+        AsyncStorage.removeItem('userData');
+      } else if (error?.message && error.message.includes('Authentication failed')) {
+        console.log('🔄 Authentication failed, clearing auth data...');
+        AsyncStorage.removeItem('auth_token');
+        AsyncStorage.removeItem('userData');
+      }
+      
       this.callbacks.onError?.(error);
     });
 

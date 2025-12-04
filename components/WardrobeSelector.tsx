@@ -11,6 +11,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useAuth } from '../contexts/auth-context';
 import { roomApi } from '../services/roomApi';
 import { Wardrobe, wardrobeApi } from '../services/wardrobeApi';
 
@@ -36,6 +37,7 @@ export default function WardrobeSelector({
   const [wardrobes, setWardrobes] = useState<Wardrobe[]>([]);
   const [loadingWardrobes, setLoadingWardrobes] = useState(false);
   const [rooms, setRooms] = useState<{[key: string]: { name: string } }>({});
+  const { user: currentUser } = useAuth();
 
   useEffect(() => {
     if (visible) {
@@ -87,6 +89,13 @@ export default function WardrobeSelector({
 
   const handleWardrobeSelect = (wardrobeId: string) => {
     onSelect(wardrobeId);
+  };
+
+  const getUserRoleForWardrobe = (wardrobe: Wardrobe): 'Owner' | 'Editor' | 'Contributor' | 'Viewer' => {
+    if (!currentUser) return 'Viewer';
+    if ((wardrobe.owner as any)?._id === currentUser._id) return 'Owner';
+    const selfMember = (wardrobe.members || []).find(m => (m.userId as any)?._id === currentUser._id);
+    return (selfMember?.role as any) || 'Viewer';
   };
 
   const getWardrobeEmoji = (occasionType: string) => {
@@ -150,11 +159,22 @@ export default function WardrobeSelector({
               keyExtractor={(item) => item._id}
               renderItem={({ item }) => {
                 const room = rooms[item.roomId];
+                const role = getUserRoleForWardrobe(item);
+                const isViewer = role === 'Viewer';
                 return (
                   <TouchableOpacity
-                    style={styles.wardrobeOption}
-                    onPress={() => handleWardrobeSelect(item._id)}
-                    disabled={loading}
+                    style={[
+                      styles.wardrobeOption,
+                      isViewer && styles.wardrobeOptionDisabled
+                    ]}
+                    onPress={() => {
+                      if (isViewer) {
+                        Alert.alert('View-only access', 'You do not have permission to add items to this wardrobe.');
+                        return;
+                      }
+                      handleWardrobeSelect(item._id);
+                    }}
+                    disabled={loading || isViewer}
                   >
                     <Text style={styles.wardrobeEmoji}>
                       {getWardrobeEmoji(item.occasionType)}
@@ -164,18 +184,23 @@ export default function WardrobeSelector({
                       <Text style={styles.wardrobeCount}>
                         {item.itemCount} items • {item.occasionType}
                       </Text>
-                      {room && (
-                        <View style={styles.roomInfo}>
-                          <Ionicons name="home-outline" size={12} color="#666" />
-                          <Text style={styles.roomName}>{room.name}</Text>
+                      <View style={styles.roleRow}>
+                        <View style={[styles.roleBadge, isViewer ? styles.roleBadgeViewer : styles.roleBadgeEditor]}>
+                          <Text style={styles.roleBadgeText}>{role}</Text>
                         </View>
-                      )}
+                        {room && (
+                          <View style={styles.roomInfo}>
+                            <Ionicons name="home-outline" size={12} color="#666" />
+                            <Text style={styles.roomName}>{room.name}</Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                     {loading ? (
                       <ActivityIndicator size="small" color="#E91E63" />
-                    ) : (
+                    ) : !isViewer ? (
                       <Text style={styles.addIcon}>+</Text>
-                    )}
+                    ) : null}
                   </TouchableOpacity>
                 );
               }}
@@ -259,6 +284,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     marginBottom: 8,
   },
+  wardrobeOptionDisabled: {
+    opacity: 0.6,
+  },
   wardrobeEmoji: {
     fontSize: 24,
     marginRight: 12,
@@ -280,6 +308,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
+  },
+  roleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  roleBadgeEditor: {
+    backgroundColor: '#E91E63',
+  },
+  roleBadgeViewer: {
+    backgroundColor: '#9E9E9E',
+  },
+  roleBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
   },
   roomName: {
     fontSize: 11,

@@ -1,3 +1,4 @@
+import { useAuth } from '@/contexts/auth-context';
 import { useSession } from '@/contexts/session-context';
 import { roomAPI, userAPI } from '@/services/api';
 import { wardrobeApi } from '@/services/wardrobeApi';
@@ -6,17 +7,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  ImageBackground,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    ImageBackground,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -38,6 +39,7 @@ interface WardrobeMember {
 
 export default function CreateWardrobeScreen() {
   const { sessionRoomId } = useSession();
+  const { user: currentUser } = useAuth();
   const { roomId } = useLocalSearchParams();
   const [wardrobeName, setWardrobeName] = useState('');
   // Privacy setting removed per requirements
@@ -76,12 +78,14 @@ export default function CreateWardrobeScreen() {
         if (response.status === 'success' && response.data) {
           // Extract users from room members
           const roomMembers = response.data.room.members || [];
-          const users = roomMembers.map((member: any) => ({
+          const users = roomMembers
+            .map((member: any) => ({
             _id: member.userId._id || member.userId,
             name: member.userId.name || member.name,
             email: member.userId.email || member.email,
             profileImage: member.userId.profileImage || member.profileImage
-          }));
+            }))
+            .filter((u: any) => !currentUser || u._id !== currentUser._id);
           setUsers(users);
           console.log(`Loaded ${users.length} users from room`);
         } else {
@@ -89,7 +93,9 @@ export default function CreateWardrobeScreen() {
           // Fallback to all users if room loading fails
           response = await userAPI.getAll({ limit: 50 });
           if (response.status === 'success' && response.data) {
-            setUsers(response.data.users);
+            const allUsers = (response.data.users || [])
+              .filter((u: any) => !currentUser || u._id !== currentUser._id);
+            setUsers(allUsers);
             console.log(`Loaded ${response.data.users.length} users from fallback`);
           }
         }
@@ -98,7 +104,9 @@ export default function CreateWardrobeScreen() {
         console.log('No room context, loading all users');
         response = await userAPI.getAll({ limit: 50 });
         if (response.status === 'success' && response.data) {
-          setUsers(response.data.users);
+          const allUsers = (response.data.users || [])
+            .filter((u: any) => !currentUser || u._id !== currentUser._id);
+          setUsers(allUsers);
           console.log(`Loaded ${response.data.users.length} users from all users`);
         }
       }
@@ -137,6 +145,7 @@ export default function CreateWardrobeScreen() {
   };
 
   const filteredUsers = users.filter(user => 
+    (!currentUser || user._id !== currentUser._id) &&
     !members.some(member => member.userId === user._id) &&
     (user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
      user.email.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -168,6 +177,7 @@ export default function CreateWardrobeScreen() {
         emoji: '👗', // Default emoji
         // description and privacy removed
         roomId: currentRoomId,
+        // Do not include creator here; backend should implicitly set creator as owner/editor
         members: members.map(member => ({
           userId: member.userId,
           role: member.role as 'Editor' | 'Contributor' | 'Viewer'

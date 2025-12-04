@@ -1,4 +1,5 @@
 import { ThemedView } from "@/components/themed-view";
+import { useAuth } from "@/contexts/auth-context";
 import { useSession } from "@/contexts/session-context";
 import { roomAPI } from "@/services/api";
 import { WardrobeItem as ApiWardrobeItem, Wardrobe, wardrobeApi } from "@/services/wardrobeApi";
@@ -14,6 +15,7 @@ import {
     Alert,
     FlatList,
     Image,
+    ImageBackground,
     StyleSheet,
     Text,
     TextInput,
@@ -46,6 +48,7 @@ interface WardrobeItem {
 
 export default function WardrobesScreen() {
     const { sessionRoomId } = useSession();
+    const { user: currentUser } = useAuth();
     const { roomId } = useLocalSearchParams();
     const [searchQuery, setSearchQuery] = useState("");
     const [wardrobes, setWardrobes] = useState<Wardrobe[]>([]);
@@ -233,6 +236,18 @@ export default function WardrobesScreen() {
             : ['#FFEEEC', '#FFFFFF'] as const; // Pink to white
         
         const wardrobeItemsList = wardrobeItems[item._id] || [];
+
+        // Determine current user's role for this wardrobe
+        let currentUserRole: 'Owner' | 'Editor' | 'Contributor' | 'Viewer' | null = null;
+        if (currentUser) {
+            if (item.owner && (item.owner as any)._id === currentUser._id) {
+                currentUserRole = 'Owner';
+            } else if (Array.isArray(item.members)) {
+                const selfMember = item.members.find(m => (m.userId as any)._id === currentUser._id);
+                currentUserRole = (selfMember?.role as any) || null;
+            }
+        }
+        const roleLabel = currentUserRole || 'Viewer';
         
         return (
             <LinearGradient
@@ -245,7 +260,7 @@ export default function WardrobesScreen() {
                     styles.roleBadge,
                     isEven ? styles.roleBadgePurple : styles.roleBadgePink
                 ]}>
-                    <Text style={styles.roleText}>Owner</Text>
+                    <Text style={styles.roleText}>{roleLabel}</Text>
                 </View>
                 
                 <View style={styles.categoryHeader}>
@@ -364,13 +379,18 @@ export default function WardrobesScreen() {
                                 </Text>
                             </View>
                         ) : wardrobes.length === 0 ? (
-                            <View style={styles.noRoomContainer}>
-                                <Text style={styles.noRoomIcon}>👗</Text>
-                                <Text style={styles.noRoomTitle}>No Wardrobes</Text>
-                                <Text style={styles.noRoomMessage}>
-                                    No wardrobes found for this room. Create one to get started!
-                                </Text>
-                            </View>
+                            <ImageBackground
+                                source={{ uri: 'https://media.lordicon.com/icons/wired/lineal/1619-closet.gif' }}
+                                style={styles.emptyWardrobesBg}
+                                imageStyle={styles.emptyWardrobesBgImage}
+                            >
+                                <View style={styles.emptyWardrobesOverlay}>
+                                    <Text style={styles.emptyNoWardrobesTitle}>No Wardrobes</Text>
+                                    <Text style={styles.emptyNoWardrobesMessage}>
+                                        No wardrobes found for this room. Create one to get started!
+                                    </Text>
+                                </View>
+                            </ImageBackground>
                         ) : null
                     }
                 />
@@ -634,5 +654,35 @@ const styles = StyleSheet.create({
         color: '#666',
         textAlign: 'center',
         lineHeight: 24,
+    },
+    emptyWardrobesBg: {
+        height: 400,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 60,
+    },
+    emptyWardrobesBgImage: {
+        resizeMode: 'cover',
+        opacity: 0.18,
+    },
+    emptyWardrobesOverlay: {
+        paddingHorizontal: 24,
+        paddingVertical: 16,
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.7)',
+        borderRadius: 12,
+    },
+    emptyNoWardrobesTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 6,
+        textAlign: 'center',
+    },
+    emptyNoWardrobesMessage: {
+        fontSize: 12,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 18,
     },
 });

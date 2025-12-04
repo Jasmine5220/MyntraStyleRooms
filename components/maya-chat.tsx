@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   Alert,
@@ -105,6 +106,15 @@ const MayaChat: React.FC<MayaChatProps> = ({
     }
   };
 
+  const navigateToProductDetails = (productData: any) => {
+    const productId = productData?.productId || productData?.id || productData?._id || productData?.product_id;
+    if (!productId) {
+      Alert.alert('Unavailable', 'This product cannot be opened right now.');
+      return;
+    }
+    router.push(`/product/${productId}` as any);
+  };
+
   const handleWardrobeSelect = async (wardrobeId: string) => {
     if (!selectedProduct) return;
 
@@ -152,7 +162,11 @@ const MayaChat: React.FC<MayaChatProps> = ({
   };
 
   const renderProductCard = (productData: any, isUserMessage: boolean = false) => (
-    <View style={[styles.productCard, isUserMessage && styles.userProductCard]}>
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={() => navigateToProductDetails(productData)}
+      style={[styles.productCard, isUserMessage && styles.userProductCard]}
+    >
       {/* Main Product Image */}
       <View style={styles.productImageContainer}>
         <Image 
@@ -219,7 +233,7 @@ const MayaChat: React.FC<MayaChatProps> = ({
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 
   const renderMessage = ({ item }: { item: Message }) => {
@@ -251,14 +265,16 @@ const MayaChat: React.FC<MayaChatProps> = ({
         {/* Message Content */}
         <View style={[
           styles.messageContainer,
-          isUserMessage ? styles.userMessage : styles.otherMessage
+          isUserMessage ? styles.userMessage : styles.otherMessage,
+          (isMayaMessage && !isUserMessage) && styles.mayaMessage,
         ]}>
           {item.isProduct && item.productData ? (
             renderProductCard(item.productData, isUserMessage)
           ) : (
             <Text style={[
               styles.messageText,
-              isUserMessage ? styles.userMessageText : styles.otherMessageText
+              isUserMessage ? styles.userMessageText : styles.otherMessageText,
+              (isMayaMessage && !isUserMessage) && styles.mayaMessageText,
             ]}>
               {item.text}
             </Text>
@@ -276,7 +292,7 @@ const MayaChat: React.FC<MayaChatProps> = ({
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'padding'} style={styles.container}>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
     {/* <View style={styles.container}> */}
       <SafeAreaView style={styles.container}>
         {/* Header */}
@@ -476,9 +492,9 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
   },
   messageContainer: {
-    maxWidth: '85%',
-    borderRadius: 16,
-    padding: 12,
+    maxWidth: '82%',
+    borderRadius: 12,
+    padding: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -496,8 +512,8 @@ const styles = StyleSheet.create({
     marginRight: '15%',
   },
   messageText: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
     marginBottom: 4,
   },
   userMessageText: {
@@ -520,27 +536,29 @@ const styles = StyleSheet.create({
   },
   productCard: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'transparent',
+    borderWidth: 0,
+    // Remove horizontal gutter inside the message bubble
+    marginLeft: -8,
+    marginRight: -8,
+    // Remove top gutter so image touches the top of the bubble
+    marginTop: -8,
   },
   userProductCard: {
     backgroundColor: '#f8f9fa',
+    // Keep normal spacing for user messages
+    marginTop: 0,
   },
   productImageContainer: {
     position: 'relative',
     backgroundColor: '#f0f0f0',
-    height: 200,
+    height: 180,
   },
   mainProductImage: {
     width: '100%',
-    height: 200,
+    height: 180,
     resizeMode: 'cover',
     backgroundColor: '#f0f0f0',
   },
@@ -576,41 +594,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   productInfo: {
-    padding: 12,
+    padding: 10,
   },
   productTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   productTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#1a1a1a',
     flex: 1,
   },
   askMoreButton: {
     backgroundColor: '#E8E0FE',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
     marginLeft: 8,
   },
   askMoreText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#1a1a1a',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   productDescription: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#666',
-    lineHeight: 18,
-    marginBottom: 8,
+    lineHeight: 16,
+    marginBottom: 6,
   },
   productPrice: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#E91E63',
   },
   reactionsContainer: {
@@ -622,19 +640,29 @@ const styles = StyleSheet.create({
   reactionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     backgroundColor: '#f0f0f0',
     borderRadius: 12,
   },
   reactionEmoji: {
-    fontSize: 12,
+    fontSize: 11,
     marginRight: 4,
   },
   reactionCount: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#666',
-    fontWeight: '500',
+    fontWeight: '400',
+  },
+  mayaMessage: {
+    maxWidth: '78%',
+    borderRadius: 10,
+    padding: 8,
+  },
+  mayaMessageText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '400',
   },
   inputContainer: {
     backgroundColor: 'transparent',

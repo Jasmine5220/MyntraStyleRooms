@@ -76,7 +76,16 @@ io.use(async (socket, next) => {
     const jwt = require('jsonwebtoken');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    if (decoded.id !== userId) {
+    // Convert both IDs to strings for comparison
+    const tokenUserId = decoded.id.toString();
+    const socketUserId = userId.toString();
+    
+    if (tokenUserId !== socketUserId) {
+      console.error('❌ Token user mismatch:', {
+        tokenUserId,
+        socketUserId,
+        decoded: decoded
+      });
       return next(new Error('Token user mismatch'));
     }
     
