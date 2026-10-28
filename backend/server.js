@@ -61,7 +61,7 @@ io.use(async (socket, next) => {
     
     // Mock authentication is restricted to non-production environments.
     if (token === 'mock-token') {
-      if (process.env.NODE_ENV === 'production') {
+      if (process.env.NODE_ENV !== 'development') {
         return next(new Error('Authentication failed'));
       }
       socket.userId = userId;
@@ -72,7 +72,7 @@ io.use(async (socket, next) => {
     }
     
     if (!token) {
-      if (process.env.NODE_ENV === 'production') {
+      if (process.env.NODE_ENV !== 'development') {
         return next(new Error('Authentication required'));
       }
       // Development-only fallback for local UI work.
