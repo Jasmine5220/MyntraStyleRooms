@@ -17,9 +17,17 @@ process.on('uncaughtException', (err) => {
 });
 
 const server = require('http').createServer(app);
+const socketAllowedOrigins = (process.env.SOCKET_CORS_ORIGIN ||
+  (process.env.NODE_ENV === 'production'
+    ? ''
+    : 'http://localhost:8081,http://localhost:19006,http://localhost:3000'))
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const io = require('socket.io')(server, {
   cors: {
-    origin: "*", // Allow all origins for development
+    origin: socketAllowedOrigins,
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -51,8 +59,11 @@ io.use(async (socket, next) => {
     const userId = socket.handshake.auth.userId;
     const userName = socket.handshake.auth.userName;
     
-    // For development, allow mock authentication
+    // Mock authentication is restricted to non-production environments.
     if (token === 'mock-token') {
+      if (process.env.NODE_ENV === 'production') {
+        return next(new Error('Authentication failed'));
+      }
       socket.userId = userId;
       socket.userName = userName || 'You';
       socket.avatar = socket.handshake.auth.userAvatar;
@@ -61,7 +72,10 @@ io.use(async (socket, next) => {
     }
     
     if (!token) {
-      // For development, allow connection without token
+      if (process.env.NODE_ENV === 'production') {
+        return next(new Error('Authentication required'));
+      }
+      // Development-only fallback for local UI work.
       console.log('⚠️ No token provided, allowing connection in development mode');
       const userId = socket.handshake.auth.userId || 'dev-user-' + Math.random().toString(36).substr(2, 9);
       const userName = socket.handshake.auth.userName || 'Dev User';
@@ -770,10 +784,15 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // CORS configuration
+const allowedHttpOrigins = (process.env.CORS_ORIGIN ||
+  process.env.SOCKET_CORS_ORIGIN ||
+  (process.env.NODE_ENV === 'production' ? '' : ''))
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com'] 
-    : true, // Allow all origins in development
+  origin: process.env.NODE_ENV === 'production' ? allowedHttpOrigins : true,
   credentials: true
 }));
 
@@ -798,7 +817,7 @@ if (process.env.NODE_ENV === 'development' && !mongoUri) {
     ? mongoUri 
     : mongoUri.replace('mongodb.net/', 'mongodb.net/myntra-fashion');
 
-  console.log('🔗 Connecting to Myntra Fashion Database:', mongoUriWithDb);
+  console.log('🔗 Connecting to Myntra Fashion Database...');
 
   mongoose.connect(mongoUriWithDb, {
     maxPoolSize: 10,
